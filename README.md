@@ -1,4 +1,4 @@
 # lp
-Live Projects
+Projects
 
 Project-based python practice
