@@ -1,4 +1,3 @@
-# lp
-Projects
+# Projects
 
 Project-based python practice
