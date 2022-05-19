@@ -21,4 +21,3 @@ The model was then rerun on the combined training and testing time period and a 
 
 ### Result
 The seasonal auto arima model did a reasonable job of predicting bike usage for the pandemic period, imagining that the pandemic hadn't happened. The range of usage in the predicted period isn't as wide in the training period with the City Quay prediction showing a best fit.
-
