@@ -5,23 +5,20 @@ I use Dublin Bikes datasets from 'https://data.gov.ie/dataset/dublinbikes-api an
 * Grangegorman Lower (Central)
 * City Quay
 
+Measuring bike usage was based on available bike stands, the best metric available. 
+
+### Data Cleaning
 Cleaning of the dataset included the following:
 
-* 
-* 
-* 
+* Grouping bikes available by time and resampling by day
+* Adding in missing values using the interpolate function
+* Replacing values great than the number of bike stands available
 
-Feature engineering was done to add additional information to the dataset which might help with classification. In this case, text length and punctuation as a percentage of text were calculated and assessed as features. The former added some useful information while the latter added none as wasn't used. 
+### Data Analysis
+A plot was created showing usage of the bike stands at the three stations over the entire time series. The date range of interest before the pandemic was filtered and split into training and testing segments. A seasonal auto arima model was run to find the best model for the training data and the testing segment was predicted and compared to the actual results with reasonable success given the circumstances. 
 
-After this, data cleaning continued.
-•	Data transformation for text length
-•	Splitting the data into training and test sets
-•	Vectorizing the tokens (TF-IDF)
-•	Estimating best hyperparameters
-•	Running and evaluating the random forest and gradient boosting models based on
-	o	Time taken 
-	o	Precision
-	o	Recall
-	o	Accuracy
-	
-After all of this was done, the results for both models were visualised in the form of classification report, a confusion matrix and an ROC curve. 
+The model was then rerun on the combined training and testing time period and a best model was found again using the seasonal auto arima. This fitted model was used to predict the bike usage for the period of the pandemic. This process was repeated with each of the three stations and visualisations were created (see images folder) to visualise the predictions. 
+
+### Result
+The seasonal auto arima model did a reasonable job of predicting bike usage for the pandemic period, imagining that the pandemic hadn't happened. The range of usage in the predicted period isn't as wide in the training period with the City Quay prediction showing a best fit.
+
