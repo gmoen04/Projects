@@ -4,4 +4,5 @@ I use a linear regression model and an auto arima model and compare their MAE an
 
 **Files**
 * Forecasting Public Transport.Rmd: R markdown file with the cleaning and analysis
+* Forecasting Public Transport.Rpdf: PDF output from Rmd file with visualisations
 * publicTransport_part.csv: CSV file with the data used for the analysis
