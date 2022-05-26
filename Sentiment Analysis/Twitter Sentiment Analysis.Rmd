@@ -27,6 +27,10 @@ library("wordcloud")
 ## Bringing in Tweets
 Tweets have been saved as a csv and are imported here
 ```{r}
+# Reading in the saved tweets
+swu_18000 <- as.data.frame(readr::read_csv("/Users/garethmoen/Documents/Data Science/Portfolio/Sentiment Analysis/swu_18000.csv")) # Read in the saved data
+
+# Original method used to bring in tweets
 # Getting twitter trends for Ireland
 # ire_trends <- get_trends(woeid = "Ireland")
 # head(ire_trends)
@@ -37,8 +41,8 @@ Tweets have been saved as a csv and are imported here
 # Bringing in 18000 tweets with the hashtag #StandWithUkraine, tweets in English (5th Mar)
 # swu_18000 <- search_tweets("#StandWithUkraine", n = 18000, include_rts = FALSE, type = "mixed", lang = "en")
 # readr::write_csv(swu_18000,"swu_18000.csv") # Saving the results to file
-swu_18000 <- as.data.frame(readr::read_csv("/Users/garethmoen/Documents/Data Science/Portfolio/Sentiment Analysis/swu_18000.csv")) # Read in the saved data
 ```
+
 
 ### Full project used 400,000 tweets but is too big for Github storage
 
