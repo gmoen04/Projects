@@ -26,5 +26,5 @@ After all of this was done, the results for both models were visualised in the f
 	* The analysis process once the data had been properly cleaned	
 * data_cleaning.ipynb
 	* The process of getting the data ready for analysis	 	
-* data_reduced.csv
+* dataset_reduced.csv
 	* The reduced version of the dataset (used for analysis) of a size suitable for uploading	
