@@ -20,3 +20,9 @@ After this, data cleaning continued.
 	* Accuracy
 	
 After all of this was done, the results for both models were visualised in the form of a classification report, a confusion matrix and an ROC curve. 
+
+**Files**
+* data_analysis.ipynb
+	* The analysis process once the data had been properly cleaned	
+* data_cleaning.ipynb
+	* The process of getting the data ready for analysis	 	
