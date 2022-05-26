@@ -1,6 +1,6 @@
 # Projects
 
-Portfolio Projects
+Data Science Portfolio Projects
 
 Navigate within individual folders to see files relevant to that project.
 
