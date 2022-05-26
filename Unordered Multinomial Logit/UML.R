@@ -24,13 +24,11 @@ pkgTest <- function(pkg){
 }
 
 # load any necessary packages
-# ex: stringr
-# lapply(c("stringr"),  pkgTest)
 
 lapply(c("stargazer", "stringr", "tidyverse", "ggplot2", "nnet", "pscl", "AER"),  pkgTest)
 
 # set wd for current folder
-setwd("/Users/garethmoen/Documents/PG Dip - ASDS/Stats II/MyProblemSets/PS3/my_answers")
+# setwd("/Users/etc....")
 
 #### 1. Unordered multinomial logit ####
 
