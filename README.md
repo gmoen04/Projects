@@ -1,6 +1,6 @@
 # Projects
 
-Project-based python practice
+Portfolio Projects
 
 Navigate within individual folders to see files relevant to that project.
 
