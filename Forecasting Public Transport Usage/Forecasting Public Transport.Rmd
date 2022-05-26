@@ -1,0 +1,174 @@
+---
+title: "Forecasting Public Transport Usage"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+# remove objects
+rm(list=ls())
+# detach all libraries
+detachAllPackages <- function() {
+  basic.packages <- c("package:stats", "package:graphics", "package:grDevices", "package:utils", "package:datasets", "package:methods", "package:base")
+  package.list <- search()[ifelse(unlist(gregexpr("package:", search()))==1, TRUE, FALSE)]
+  package.list <- setdiff(package.list, basic.packages)
+  if (length(package.list)>0)  for (package in package.list) detach(package,  character.only=TRUE)
+}
+detachAllPackages()
+
+# load libraries
+pkgTest <- function(pkg){
+  new.pkg <- pkg[!(pkg %in% installed.packages()[,  "Package"])]
+  if (length(new.pkg)) 
+    install.packages(new.pkg,  dependencies = TRUE)
+  sapply(pkg,  require,  character.only = TRUE)
+}
+
+# Load necessary packages
+lapply(c("tidyverse", "forecast", "zoo", "lubridate", "caret", "TSstudio", "plotly", "xts", "stargazer"),  pkgTest)
+
+# set wd for current folder
+setwd(dirname("/Users/...Forecasting Public Transport.Rmd"))
+```
+***
+## Import data
+```{r}
+td <- read_csv("publicTransport_part.csv")
+#View(td)  
+```
+The time series runs from 1st March 2005 at 06:30 to 21st March at 22:00. There are 63 time periods per day and 1,323 time periods across the total time series to give us a total of 21 days of data. There is no data for the period between 22:00 and 06:30 as the bus terminal is probably closed during this period. 
+
+***
+## Convert to ts and plot  
+```{r Passengers Arriving at the Terminal}
+td.ts <- ts(td$DEMAND, frequency = 63) # create a ts based on observations
+autoplot(td.ts,
+         xlab="Days",
+         ylab="Number of Passengers Arriving at the Terminal",
+         color="royalblue") + 
+  theme(text = element_text(size = 14))
+```
+## Overview of the data
+
+Looking at the data we can see that it has a clear seasonality to it, with the data looking like it starts on a Tuesday, where there is lots of usage for weekdays and usage then drops off for two weekend days. Each day seems to have two peaks, morning usage and evening usage, with the latter being much higher. Taking a Monday to Friday view there seems to be a drop in numbers as the week progresses, with Mondays having highest usage and Fridays least usage, but this isn't completely consistent. There doesn't appear to be a trend to the data, although we only have three weeks of data available. 
+Given we have three weeks of data, it would be best divided into three parts with the first two used for training and the final part used for validation. With a frequency of 63 for the number of data points per day, this doesn't give us many data points to help with forecasting but as there doesn't seem to be a trend and the patterns seems to hold fairly consistently a reasonable forecast is still possible. 
+
+## Decompose the data into three components
+```{r Decomposed Data}
+# Components: Seasonal, trend, remainder
+
+td.ts.dec <- stl(td.ts, s.window = "periodic") 
+autoplot(td.ts.dec,
+         main = "Seasonal component, the trend and the remainder in the data") + 
+  theme(text = element_text(size = 14))
+```
+
+## Msts for object class
+From the data presented it seems like multi-seasonal time series (msts) would be the best class of object for this dataset as there is seasonality on a daily and weekly basis. With a multi-seasonal time series we can account for a frequency of 63 (a daily seasonality) and a frequency of 441 (a weekly seasonality). This msts object allows for the multi-seasonal periods that the normal ts object can't take into consideration.
+
+***
+## ARIMA model
+
+```{r ARIMA model, validation and accuracy}
+td.msts <- msts(td$DEMAND[1:1323], seasonal.periods = c(63, 441)) # daily and weekly seasonality
+train.msts <- msts(td$DEMAND[1:882], seasonal.periods = c(63, 441)) # two weeks of training
+valid.msts <- msts(td$DEMAND[883:1323], seasonal.periods = c(63, 441)) # one week of validation
+
+arima.mod <- auto.arima(train.msts, 
+                        xreg = fourier(train.msts, K = c(20, 40)))
+
+arima.pred <- forecast(arima.mod, xreg = fourier(valid.msts, K = c(20, 40)))
+accuracy(arima.pred, td.msts)
+checkresiduals(arima.pred)
+```
+
+```{r ARIMA plot, include=FALSE}
+plot(arima.pred, xlab = "Date", ylab = "Number of Passengers Arriving at the Terminal")
+lines(td.msts)
+```
+
+```{r ARIMA plot in ggplot}
+clrs <- c("red", "royalblue")
+autoplot(arima.pred, series ="ARIMA") + 
+         ggtitle("Terminal Usage and Predicted Usage") +
+         xlab("Weeks") +
+         ylab("Number of Passengers Arriving at the Terminal") +
+  autolayer(td.msts, series = "True Values") +
+  autolayer(arima.pred, series ="ARIMA Validation") +
+  guides(colour=guide_legend(title="Time Series")) +
+  scale_color_manual(values=clrs) + 
+  theme(text = element_text(size = 14))
+```
+This does reasonably well at forecasting the both daily highs, and also approximates the weekend drop in demand quite well, although Sunday's prediction seems a little off. K of 20, 40 took about 90 seconds to complete. Higher K values can produce better results but place additional demands on computer resources (K should not exceed half of the frequency).
+
+***
+
+## As an alternative I'll try using a linear model with trend and seasonality as predictors.
+
+```{r Linear Model with Trend and Seasonality}
+lmts.mod <- tslm(train.msts ~ trend + season, lambda = "auto")
+
+lmts.pred <- forecast(lmts.mod, h = 441)
+
+accuracy(lmts.pred, td.msts)
+checkresiduals(lmts.pred)
+
+# plot(lmts.pred)
+# lines(td.msts)
+
+autoplot(lmts.pred, x=td$DATE, colour=TRUE,
+         main="Terminal Usage and Predicted Usage",
+         xlab="Weeks",
+         ylab="Number of Passengers Arriving at the Terminal",
+         color="royalblue") +
+  autolayer(td.msts, series = "True Values") +
+  autolayer(lmts.pred, series ="Linear Validation") +
+  guides(colour=guide_legend(title="Time Series")) +
+  scale_color_manual(values=clrs) + 
+  theme(text = element_text(size = 14))
+```
+This model performs well and is computationally less intensive as it only took seconds to run although we do have coefficients for each 15-minute period and an intercept, which amounts to 442 in total.  Although this has  produced a good results I must be concerned with overfitting.
+
+Next let's try a seasonal naive method
+
+```{r linear trend season model}
+summary(lmts.mod)
+
+#accuracy(snaive(train.msts, h = 441), td.msts)
+sn.train <- snaive(train.msts, h = 441)
+sn.pred <- forecast(sn.train, h=441)
+
+plot(sn.pred)
+line(td.ts)
+
+accuracy(sn.pred, td.msts)
+```
+## Final Model
+### ARIMA(0,0,3)
+```{r}
+train2.msts <- msts(td$DEMAND[1:1323], seasonal.periods = c(63, 441)) # full period to train on
+
+arima2.mod <- Arima(train2.msts, order = c(0, 0, 3),
+                        xreg = fourier(train2.msts, K = c(20, 40)))
+# new model trained on full dataset
+
+arima2.pred <- forecast(arima2.mod, xreg = fourier(train2.msts, K = c(20, 40), h=189))
+checkresiduals(arima2.pred)
+
+# Plot results
+clrs2 <- c("green", "royalblue")
+autoplot(arima2.pred, series ="ARIMA") + 
+         ggtitle("Terminal Usage and Forecast") +
+         xlab("Weeks") +
+         ylab("Number of Passengers Arriving at the Terminal") +
+  autolayer(td.msts, series = "True Values") +
+  autolayer(arima2.pred, series ="ARIMA Forecast") +
+  guides(colour=guide_legend(title="Time Series")) +
+  scale_color_manual(values=clrs2) + 
+  theme(text = element_text(size = 14))
+```
+```{r}
+arima2.pred
+```
+
+## Final comments
+The final forecast used an ARIMA(0, 0, 3) model and looks to have done a good job on the data taking into consideration morning and evening peaks as well as the weekly seasonality.
