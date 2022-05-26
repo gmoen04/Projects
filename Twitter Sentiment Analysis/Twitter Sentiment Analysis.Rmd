@@ -1,0 +1,206 @@
+---
+title: "Twitter Sentiment Analysis"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Install packages
+
+```{r}
+#Load libraries
+library('quanteda')
+library('readtext')
+library('tidyverse')
+library('quanteda.textstats')
+library("rtweet")
+# #library("tidytext")
+library("textstem")
+library("httr")
+library("jsonlite")
+library("dplyr")
+library("wordcloud")
+```
+
+## Bringing in Tweets
+Tweets have been saved as a csv and are imported here
+```{r}
+# Getting twitter trends for Ireland
+# ire_trends <- get_trends(woeid = "Ireland")
+# head(ire_trends)
+# ire_trends_7mar <- get_trends(woeid = "23424803")
+
+# Getting twitter trends for the world
+# wor_trends <- get_trends(woeid = "World", lang = "en")
+# Bringing in 18000 tweets with the hashtag #StandWithUkraine, tweets in English (5th Mar)
+# swu_18000 <- search_tweets("#StandWithUkraine", n = 18000, include_rts = FALSE, type = "mixed", lang = "en")
+# readr::write_csv(swu_18000,"swu_18000.csv") # Saving the results to file
+swu_18000 <- as.data.frame(readr::read_csv("/Users/garethmoen/Documents/Data Science/Portfolio/Sentiment Analysis/swu_18000.csv")) # Read in the saved data
+```
+
+### Full project used 400,000 tweets but is too big for Github storage
+
+```{r}
+# Bringing in 400,000 tweets with the hashtag #StandWithUkraine, tweets in English (5th Mar)
+# swu_400000 <- search_tweets("#StandWithUkraine", n = 400000, include_rts = FALSE, type = "mixed", retryonratelimit = TRUE, lang = "en")
+# swu_400000 <- subset(swu_400000, is.na(swu_400000$reply_to_status_id))
+# readr::write_csv(swu_400000,"swu_400000.csv") # Saving the results to file
+# swu_400000 <- readr::read_csv("swu_400000.csv") # Now the file is save, only read it in
+```
+
+## Cleaning the tweets
+
+```{r}
+# Tweets should be original tweets, not retweets, as the original API request filtered them out
+# Selecting columns
+df <- swu_18000 %>%
+  select(status_id, 
+         created_at,
+         text,
+         source, 
+         screen_name, # used to remove irrelevant tweets later
+         favorite_count,
+         retweet_count
+  ) # %>%
+  #as.data.frame() 
+
+# Remove large swu_18000 tibble
+#rm(swu_18000)
+
+# Removal of irrelevant sources
+df <- df[-which(df$screen_name == "ArvadaRadio"),] # radio station
+df <- df[-which(df$screen_name == "EstellaBell1"),] # other news
+df <- df[-which(df$screen_name == "AlenaKazakevich"),] # repeated tweets
+df <- df[-which(df$screen_name == "Fidget02"),] # only hashtags
+
+# Remove duplicated status IDs if needed
+# df <- df[-which(duplicated(df$status_id)),]
+
+# Filter for popular tweets with 1 or more in the 'favourite_count'
+df <- df[df$favorite_count >= 1,]
+
+# Randomise the order of the tweets
+set.seed(1234)
+rows <- sample(nrow(df))
+df_shuf  <- df[rows, ]
+
+# Looking at tweets related to Putin
+#df_putin <- dplyr::filter(df_shuf, grepl('\\bputin\\b', text) | grepl('\\bPutin\\b', text))
+
+# Looking at tweets related to 'ukraine'  or'ukrainians'
+df_ukr <- dplyr::filter(df_shuf, grepl('\\ukraine\\b', text) | grepl('\\bukrainians\\b', text)| grepl('\\bUkrainians\\b', text)| grepl('\\bukrainian\\b', text)| grepl('\\bUkrainian\\b', text)| grepl('\\bUkraine\\b', text))
+
+# Conversion to corpus
+corp <- corpus(df_ukr, 
+               docid_field = "status_id",
+               text_field = "text",
+               unique_docnames = TRUE)
+
+# summary(corp)
+
+prep_toks <- function(text_corpus){
+  toks <- quanteda::tokens(text_corpus,
+                 include_docvars = TRUE) %>%
+    tokens_tolower() %>%
+    tokens_remove(stopwords("english"), padding = TRUE) %>%
+    tokens_remove('[\\p{P}\\p{S}]', valuetype = 'regex', padding = TRUE)
+  return(toks)
+}
+
+toks <- corp %>%
+  prep_toks()
+
+# head(toks)
+```
+
+### Creating collocations
+
+```{r}
+get_coll <- function(tokens){
+  unsup_col <- textstat_collocations(tokens,
+                                     method = "lambda",
+                                     size = 2,
+                                     min_count = 5,
+                                     smoothing = 0.5)
+  
+  unsup_col <- unsup_col[order(-unsup_col$count),] # sort detected collocations by count (descending)
+  return(unsup_col)
+}
+collocations <- get_coll(toks) # create collocations
+
+toks <- tokens_compound(toks, pattern = collocations[collocations$z > 5]) # merge collocations into toks
+
+toks <- tokens_remove(toks, c("amp", "come", "months", "weeks", "analysts_said", "can", "today", "now", "", "ukraine", "ukrainian", "ukrainians"), valuetype = "fixed") # Remove extra stopwords
+
+toks <- quanteda::tokens(toks, 
+               remove_numbers = TRUE,
+               remove_punct = TRUE,
+               remove_symbols = TRUE,
+               remove_hyphens = TRUE,
+               remove_separators = TRUE,
+               remove_url = TRUE) # remove other uninformative text
+```
+Creating collocations and returning them back to the main corpus may not be useful as some of the words with sentiment may be lost. So for example, 'aggressor' would be considered a negative sentiment, but 'russian aggressor' may not be considered such. So it's best to leave the words as they are for the purpose of sentiment analysis.
+
+```{r}
+# Creating a dfm
+dfm <- dfm(toks) # create DFM
+dfm <- dfm_trim(dfm, min_docfreq = 20) # trim DFM
+#dfm <- dfm_tfidf(dfm) # weight DFM
+
+# Top 20 most frequent words / expressions
+dfm_plot <- textstat_frequency(dfm, n = 20)
+ # use textstat_frequency(dfm, n = 30, force = TRUE) if the DFM is already weighted
+#dfm_plot <- dfm_plot[-1,]
+dfm_plot
+```
+
+### Plot the most frequent words & expressions
+```{r}
+dfm_plot %>%
+  ggplot(aes(x = reorder(feature, -frequency), y = frequency)) +
+  geom_point() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1)) +
+    labs(title = "Most frequent words in tweets",
+       x = "Words & terms",
+       y = "Frequency")
+```
+### Adding sentiment to the data
+```{r}
+# General sentiment
+dfm_sentiment <- dfm_lookup(dfm(toks), data_dictionary_LSD2015) %>% 
+    dfm_group(groups = dfm@docvars$created_at)
+# dfm_sentiment <- dfm_lookup(dfm, data_dictionary_LSD2015) %>%
+#   dfm_group(groups = date)
+```
+
+### Plot of sentiment over time
+
+```{r}
+# Only keep column 1 - 2 
+dfm_sentiment <- dfm_lookup(dfm(toks), data_dictionary_LSD2015[1:2])
+# Next prepare to plot
+docvars(dfm_sentiment, "prop_negative") <- as.numeric(dfm_sentiment[,1] / ntoken(dfm_sentiment)) 
+docvars(dfm_sentiment, "prop_positive") <- as.numeric(dfm_sentiment[,2] / ntoken(dfm_sentiment))
+
+docvars(dfm_sentiment, "net_sentiment") <- docvars(dfm_sentiment, "prop_positive") - docvars(dfm_sentiment, "prop_negative")
+
+docvars(dfm_sentiment) %>%
+    ggplot(aes(x = dfm@docvars$created_at, y = net_sentiment)) + 
+    geom_smooth() +
+    labs(title = "Tweets with 'Ukraine', sentiment analysis over time",
+       x = "Date",
+       y = "Sentiment")
+
+```
+
+### Wordcloud of most frequent words
+
+```{r}
+dfwc <- as.data.frame(dfm_plot)
+
+wordcloud(words = dfwc$feature, freq = dfwc$frequency, min.freq = 1, max.words=150, random.order=FALSE, rot.per=0.35, colors=brewer.pal(8, "Dark2"))
+
+```
