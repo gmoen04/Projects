@@ -6,7 +6,7 @@ I use two datasets, a fake news dataset and true news dataset. I added true and 
 * Removing stop words and additional ‘identifiers’ with regex
 * Stemming the words
 
-Feature engineering was done to add additional information to the dataset which might help with classification. In this case, text length and punctuation as a percentage of text were calculated and assessed as features. The former added some useful information while the latter added none as wasn't used. 
+Feature engineering was done to add additional information to the dataset which might help with classification. In this case, text length and punctuation as a percentage of text were calculated and assessed as features. The former added some useful information while the latter added none and wasn't used in the end. 
 
 After this, data cleaning continued.
 * Data transformation for text length
